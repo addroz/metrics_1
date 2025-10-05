@@ -22,10 +22,8 @@ function max_wald_cv(α::Real, k::Integer)
     return quantile(sup, 1 - α)
 end 
 
-function kolmogorov_cv(α::Real, k::Integer)
-    dist = rand(MvNormal(zeros(k), I), 10_000)
-    sup = [maximum(abs.(dist[:, i])) for i in 1:10_000]
-    return quantile(sup, 1 - α)
+function kolmogorov_cv(α::Real)
+    return sqrt(-1/2 * log(α / 2))
 end
 
 function B(y::Real, Y::AbstractVector{<:Real})
@@ -80,7 +78,13 @@ function max_wald_test(α::Real, ν_0::AbstractVector{<:Real}, B_est::AbstractVe
     return max_wald_stat(ν_0, B_est, S) > max_wald_cv(α, length(ν_0))
 end
 
-function 
+function kolmogorov_stat(ν_0::AbstractVector{<:Real}, B_est::AbstractVector{<:Real}, N::Integer)
+    return sqrt(N) * maximum(abs.(ν_0 - B_est))
+end
+
+function kolmogorov_test(α::Real, ν_0::AbstractVector{<:Real}, B_est::AbstractVector{<:Real}, N::Integer)
+    return kolmogorov_stat(ν_0, B_est, N) > kolmogorov_cv(α)
+end
 
 ##### Loading the data
 
@@ -134,8 +138,8 @@ end
 plot(plots..., layout=(length(y_values), length(N_values)), size=(1000, 1000))
 savefig("PSET1/T_test_1d_mc.pdf")
 
-##### (e): The size of multidimensional Wald-max test
-K = collect(1:10)
+##### (e-f): The size of multidimensional Wald-max test and Kolmogorov test
+K = collect(1:30)
 y_k = []
 for k in K
     push!(y_k, [quantile(Y, q) for q in collect(LinRange(0, 1, k+2)[2:(end-1)])])
@@ -143,7 +147,10 @@ end
 
 α = 0.1
 N_values = [500, 1000, 4000]
-test_results = zeros(length(K), length(N_values), M)
+test_results_wald = zeros(length(K), length(N_values), M)
+test_results_kolmogorov = zeros(length(K), length(N_values), M)
+
+Y_supp = sort(unique(Y))
 for k in eachindex(K)
     ν_0 = [B(y, Y) for y in y_k[k]]
     for j in eachindex(N_values)
@@ -151,22 +158,29 @@ for k in eachindex(K)
             sample = rand(Y, N_values[j])
             B_est = [B(y, sample) for y in y_k[k]]
             S_est = S(y_k[k], sample)
-            test_results[k, j, m] = max_wald_test(α, ν_0, B_est, S_est)
+            try
+                test_results_wald[k, j, m] = max_wald_test(α, ν_0, B_est, S_est)
+            catch SingularException
+                test_results_wald[k, j, m] = true
+            end
+            test_results_kolmogorov[k, j, m] = kolmogorov_test(α, ν_0, B_est, N_values[j])
         end
     end
 end
 
-test_sizes = [mean(test_results[k, j, :]) for k in eachindex(K), j in eachindex(N_values)]
-display(test_sizes)
+test_sizes_wald = [mean(test_results_wald[k, j, :]) for k in eachindex(K), j in eachindex(N_values)]
+test_sizes_kolmogorov = [mean(test_results_kolmogorov[k, j, :]) for k in eachindex(K), j in eachindex(N_values)]
+display(test_sizes_wald)
+display(test_sizes_kolmogorov)
+
 
 plots = []
 for j in eachindex(N_values)
-    p = plot(K, test_sizes[:, j], label="")
+    p = plot(K, test_sizes_wald[:, j], label="Wald")
+    plot!(K, test_sizes_kolmogorov[:, j], label="Kolmogorov")
     hline!([α], label = "α", color = :black, style=:dash)
     push!(plots, p)
 end
 
 plot(plots..., layout=(length(N_values)), size=(1000, 1000))
-savefig("PSET1/wald_test_sizes.pdf")
-
-##### (f): The size of multidimensional Kolmogorov test
+savefig("PSET1/wald_kolmogorov_test_sizes.pdf")
