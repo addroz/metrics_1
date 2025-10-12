@@ -75,7 +75,11 @@ function max_wald_stat(ν_0::AbstractVector{<:Real}, B_est::AbstractVector{<:Rea
 end
 
 function max_wald_test(α::Real, ν_0::AbstractVector{<:Real}, B_est::AbstractVector{<:Real}, S::AbstractMatrix{<:Real})
-    return max_wald_stat(ν_0, B_est, S) > max_wald_cv(α, length(ν_0))
+    try
+        return max_wald_stat(ν_0, B_est, S) > max_wald_cv(α, length(ν_0))
+    catch
+        return true
+    end
 end
 
 function kolmogorov_stat(ν_0::AbstractVector{<:Real}, B_est::AbstractVector{<:Real}, N::Integer)
@@ -111,7 +115,7 @@ end
 plots = []
 for j in eachindex(N_values)
     for i in eachindex(y_values)
-        p = histogram(B_values[:, i, j], label="", normalize=:pdf, bins = LinRange(minimum(B_values[:, i, :]), maximum(B_values[:, i, :]), 150))
+        p = histogram(B_values[:, i, j], label="", normalize=:pdf, bins = LinRange(minimum(B_values[:, i, :]) - 0.01, maximum(B_values[:, i, :]) + 0.01, 200))
         vline!([mean(B_values[:, i, j])], label="Mean", style=:dash)
         vline!([B(y_values[i], Y)], label="True")
         plot!(x -> pdf(Normal(mean(B_values[:, i, j]), std(B_values[:, i, j])), x), label="Normal Approximation")
@@ -139,7 +143,7 @@ plot(plots..., layout=(length(y_values), length(N_values)), size=(1000, 1000))
 savefig("PSET1/T_test_1d_mc.pdf")
 
 ##### (e-f): The size of multidimensional Wald-max test and Kolmogorov test
-K = collect(1:30)
+K = collect(1:20)
 y_k = []
 for k in K
     push!(y_k, [quantile(Y, q) for q in collect(LinRange(0, 1, k+2)[2:(end-1)])])
@@ -148,35 +152,44 @@ end
 α = 0.1
 N_values = [500, 1000, 4000]
 test_results_wald = zeros(length(K), length(N_values), M)
+test_results_wald_standardized = zeros(length(K), length(N_values), M)
 test_results_kolmogorov = zeros(length(K), length(N_values), M)
 
+display("Here")
 Y_supp = sort(unique(Y))
-for k in eachindex(K)
+display(length(Y))
+for k in K
     ν_0 = [B(y, Y) for y in y_k[k]]
+    S_true = S(y_k[k], Y)
     for j in eachindex(N_values)
+        S_true_n = sqrt(length(Y) / N_values[j]) * S_true
         for m in 1:M
             sample = rand(Y, N_values[j])
             B_est = [B(y, sample) for y in y_k[k]]
             S_est = S(y_k[k], sample)
-            try
-                test_results_wald[k, j, m] = max_wald_test(α, ν_0, B_est, S_est)
-            catch SingularException
-                test_results_wald[k, j, m] = true
+            if m == 1
+                display(S_est)
+                display(S_true_n)
             end
+            test_results_wald[k, j, m] = max_wald_test(α, ν_0, B_est, S_est)
+            test_results_wald_standardized[k, j, m] = max_wald_test(α, ν_0, B_est, S_true_n)
             test_results_kolmogorov[k, j, m] = kolmogorov_test(α, ν_0, B_est, N_values[j])
         end
     end
 end
 
 test_sizes_wald = [mean(test_results_wald[k, j, :]) for k in eachindex(K), j in eachindex(N_values)]
+test_sizes_wald_standardized = [mean(test_results_wald_standardized[k, j, :]) for k in eachindex(K), j in eachindex(N_values)]
 test_sizes_kolmogorov = [mean(test_results_kolmogorov[k, j, :]) for k in eachindex(K), j in eachindex(N_values)]
 display(test_sizes_wald)
+display(test_sizes_wald_standardized)
 display(test_sizes_kolmogorov)
 
 
 plots = []
 for j in eachindex(N_values)
     p = plot(K, test_sizes_wald[:, j], label="Wald")
+    plot!(K, test_sizes_wald_standardized[:, j], label="Wald Standardized")
     plot!(K, test_sizes_kolmogorov[:, j], label="Kolmogorov")
     hline!([α], label = "α", color = :black, style=:dash)
     push!(plots, p)
