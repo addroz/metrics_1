@@ -49,7 +49,7 @@ function ∇σ_hat(B::AbstractVector{<:Real})
 end
 
 function ∇σ2_hat(B::AbstractVector{<:Real})
-    return [(B[i] - mean(B)) / (length(B)) for i in eachindex(B)]
+    return [2 * (B[i] - mean(B)) / length(B) for i in eachindex(B)]
 end
 
 function σ_hat_var(x::AbstractVector{<:Real}, Y::AbstractVector{<:Real}, X::AbstractVector{<:Real}; 
