@@ -74,9 +74,9 @@ function tilde_σ2_hat(x::AbstractVector{<:Real}, Y::AbstractVector{<:Real}, X::
 end
 
 # Number of MC simulations
-M = 10
+M = 1000
 α = 0.05
-states = 10
+states = 50
 data = DataFrame(load("cps.dta"))
 U = data.wage
 U = collect(skipmissing(U))
