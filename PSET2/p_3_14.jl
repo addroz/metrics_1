@@ -74,9 +74,9 @@ function tilde_σ2_hat(x::AbstractVector{<:Real}, Y::AbstractVector{<:Real}, X::
 end
 
 # Number of MC simulations
-M = 100
+M = 1000
 α = 0.05
-states = 10
+states = 50
 data = DataFrame(load("cps.dta"))
 U = data.wage
 U = collect(skipmissing(U))
@@ -246,7 +246,10 @@ savefig(plt, "PSET2/true_in_CI_tilde_V_$(states).pdf")
 
 ##### (f): The χ^2 Test
 
+plt = plot()
 χ_2_test_stat = zeros(M, length(N_values))
+χ_2_test_results = zeros(M, length(N_values))
+
 for j in eachindex(N_values)
     for m in 1:M
         P = zeros(states, states)
@@ -255,7 +258,7 @@ for j in eachindex(N_values)
             P[k, k] = ((states - 1) / states)^2 * B_n_vars[m, k, 1, j] + (1 / states)^2 * sum([B_n_vars[m, l, 1, j] for l in 1:states if l != k])
             
             for l in (k+1):states
-                P[k, l] = (1 / states)^2 * (B_n_vars[m, k, 1, j] + B_n_vars[m, l, 1, j])
+                P[k, l] = - (1 / states)^2 * (B_n_vars[m, k, 1, j] + B_n_vars[m, l, 1, j])
                 P[l, k] = P[k, l]
             end
         end
@@ -263,12 +266,14 @@ for j in eachindex(N_values)
         P = Symmetric(P)
         B_norm = B_n_values[m, :, 1, j] .- mean(B_n_values[m, :, 1, j])
 
-        χ_2_test_stat[m, j] = (B_norm' * P * B_norm) / N_values[j]
+        χ_2_test_stat[m, j] = N_values[j] * (B_norm' * inv(P) * B_norm)
+        χ_2_test_results[m, j] = Int64(χ_2_test_stat[m, j] > quantile(Chisq(states), 1 - α))
     end
 
-    density(χ_2_test_stat[:, j], label = "N = $(N_values[j])")
-    savefig("PSET2/density_χ_2_test_stat_$(states)_$(N_values[j]).pdf")
+    density!(plt, χ_2_test_stat[:, j], label = "N = $(N_values[j])")
 end
 
-plot(0:0.01:30, x -> pdf(Chisq(states), x), label = L"χ^2_m")
-savefig("PSET2/density_χ_2_true_$(states).pdf")
+plot!(plt, x -> pdf(Chisq(states), x), label = L"χ^2_m")
+savefig(plt, "PSET2/density_χ_2_$(states).pdf")
+
+display(mean(χ_2_test_results, dims=1))
