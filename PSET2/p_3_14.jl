@@ -1,7 +1,7 @@
 using Pkg
 Pkg.activate(".")
 
-using LinearAlgebra, StatsBase, Statistics, Plots, StatsPlots, Random, Distributions, DataFrames, StatFiles, LaTeXStrings
+using LinearAlgebra, StatsBase, Statistics, Plots, StatsPlots, Random, Distributions, DataFrames, StatFiles, LaTeXStrings, KernelDensity
 
 ##### Key statistical functions
 function Φ(x)
@@ -74,9 +74,9 @@ function tilde_σ2_hat(x::AbstractVector{<:Real}, Y::AbstractVector{<:Real}, X::
 end
 
 # Number of MC simulations
-M = 1000
+M = 100
 α = 0.05
-states = 50
+states = 10
 data = DataFrame(load("cps.dta"))
 U = data.wage
 U = collect(skipmissing(U))
@@ -99,6 +99,9 @@ F_X = DiscreteNonParametric(collect(keys(state_rank_counts)), values(state_rank_
 
 σ_values = collect(LinRange(0.0, 3.0, 50))
 N_values = [Int64(round(length(U)/ 2)), Int64(round(length(U))), Int64(round(length(U) * 2))]
+
+B_n_values = zeros(M, states, length(σ_values), length(N_values))
+B_n_vars = zeros(M, states, length(σ_values), length(N_values))
 
 S_n_values = zeros(M, length(σ_values), length(N_values))
 S_n_vars = zeros(M, length(σ_values), length(N_values))
@@ -124,15 +127,18 @@ for i in eachindex(σ_values)
             sample_Y = (-1).^(sample_X) * σ_values[i] .+ sample_U
 
             B_n = B(collect(1:states), sample_Y, sample_X)
-            B_n_vars = B_var(collect(1:states), sample_Y, sample_X)
+            B_n_var = B_var(collect(1:states), sample_Y, sample_X)
+
+            B_n_values[m, :, i, j] = B_n
+            B_n_vars[m, :, i, j] = diag(B_n_var)
 
             S_n_values[m, i, j] = σ_hat(B_n)
-            S_n_vars[m, i, j] = σ_hat_var(collect(1:states), sample_Y, sample_X, B=B_n, B_var=B_n_vars)
+            S_n_vars[m, i, j] = σ_hat_var(collect(1:states), sample_Y, sample_X, B=B_n, B_var=B_n_var)
             S_n_CI_low[m, i, j] = S_n_values[m, i, j] - Φ_inv(1 - α/2) * sqrt(S_n_vars[m, i, j] / N_values[j])
             S_n_CI_high[m, i, j] = S_n_values[m, i, j] + Φ_inv(1 - α/2) * sqrt(S_n_vars[m, i, j] / N_values[j])
 
             V_n_values[m, i, j] = σ2_hat(B_n)
-            V_n_vars[m, i, j] = σ2_hat_var(collect(1:states), sample_Y, sample_X, B=B_n, B_var=B_n_vars)
+            V_n_vars[m, i, j] = σ2_hat_var(collect(1:states), sample_Y, sample_X, B=B_n, B_var=B_n_var)
             V_n_CI_low[m, i, j] = V_n_values[m, i, j] - Φ_inv(1 - α/2) * sqrt(V_n_vars[m, i, j] / N_values[j])
             V_n_CI_high[m, i, j] = V_n_values[m, i, j] + Φ_inv(1 - α/2) * sqrt(V_n_vars[m, i, j] / N_values[j])
 
@@ -237,3 +243,32 @@ xlabel!(plt, "σ")
 title!(plt, L"True $\sigma^2$ in CI by $\sigma^2$ for different N")
 hline!([1 - α], label = L"1 - \alpha", color = :black, style=:dash)
 savefig(plt, "PSET2/true_in_CI_tilde_V_$(states).pdf")
+
+##### (f): The χ^2 Test
+
+χ_2_test_stat = zeros(M, length(N_values))
+for j in eachindex(N_values)
+    for m in 1:M
+        P = zeros(states, states)
+
+        for k in 1:states
+            P[k, k] = ((states - 1) / states)^2 * B_n_vars[m, k, 1, j] + (1 / states)^2 * sum([B_n_vars[m, l, 1, j] for l in 1:states if l != k])
+            
+            for l in (k+1):states
+                P[k, l] = (1 / states)^2 * (B_n_vars[m, k, 1, j] + B_n_vars[m, l, 1, j])
+                P[l, k] = P[k, l]
+            end
+        end
+
+        P = Symmetric(P)
+        B_norm = B_n_values[m, :, 1, j] .- mean(B_n_values[m, :, 1, j])
+
+        χ_2_test_stat[m, j] = (B_norm' * P * B_norm) / N_values[j]
+    end
+
+    density(χ_2_test_stat[:, j], label = "N = $(N_values[j])")
+    savefig("PSET2/density_χ_2_test_stat_$(states)_$(N_values[j]).pdf")
+end
+
+plot(0:0.01:30, x -> pdf(Chisq(states), x), label = L"χ^2_m")
+savefig("PSET2/density_χ_2_true_$(states).pdf")
