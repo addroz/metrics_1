@@ -56,9 +56,15 @@ function V_OLS_HC3(X::Matrix{<:Real}, Y::Vector{<:Real}; B::Vector{<:Real} = OLS
     return N * inv_X_X * X' * U_dg * X * inv_X_X
 end
 
-function V_OLS_HOM(X::Matrix{<:Real}, Y::Vector{<:Real}; B::Vector{<:Real} = OLS(X, Y))
+function V_OLS_HOM(X::Matrix{<:Real}, Y::Vector{<:Real}; B::Vector{<:Real} = OLS(X, Y), df_correction::Bool = false)
     U = Y - X * B
-    return mean(U.^2) * inv(X' * X)
+    n = length(Y)
+    k = size(X, 2)
+    if df_correction
+        return (n / (n - k)) * sum(U.^2) * inv(X' * X)
+    else
+        return sum(U.^2) * inv(X' * X)
+    end
 end
 
 function T_stat(β_0::Real, B::Real, σ::Real)
@@ -127,13 +133,14 @@ B = OLS(X, Y)
 display(B)
 
 V_HOM = V_OLS_HOM(X, Y, B=B)
+V_HOM_1 = V_OLS_HOM(X, Y, B=B, df_correction=true)
 V_HC0 = V_OLS_HC0(X, Y, B=B)
 V_HC1 = V_OLS_HC1(X, Y, B=B)
 
 ci_HOM = (B[1] - cv_normal(α) * sqrt(V_HOM[1,1] / length(Y)), B[1] + cv_normal(α) * sqrt(V_HOM[1,1] / length(Y)))
 ci_HC0 = (B[1] - cv_normal(α) * sqrt(V_HC0[1,1] / length(Y)), B[1] + cv_normal(α) * sqrt(V_HC0[1,1] / length(Y)))
 ci_HC1 = (B[1] - cv_normal(α) * sqrt(V_HC1[1,1] / length(Y)), B[1] + cv_normal(α) * sqrt(V_HC1[1,1] / length(Y)))
-ci_T = (B[1] - cv_t(α, length(Y) - size(X, 2)) * sqrt(V_HOM[1,1] / length(Y)), B[1] + cv_t(α, length(Y) - size(X, 2)) * sqrt(V_HOM[1,1] / length(Y)))
+ci_T = (B[1] - cv_t(α, length(Y) - size(X, 2)) * sqrt(V_HOM_1[1,1] / length(Y)), B[1] + cv_t(α, length(Y) - size(X, 2)) * sqrt(V_HOM_1[1,1] / length(Y)))
 
 display(ci_HOM)
 display(ci_HC1)
