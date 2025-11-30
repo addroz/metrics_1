@@ -1,7 +1,7 @@
 using Pkg
 Pkg.activate(".")
 
-using LinearAlgebra, StatsBase, Statistics, Plots, StatsPlots, Random, Distributions, DataFrames, StatFiles, LaTeXStrings, KernelDensity, FixedEffectModels
+using LinearAlgebra, StatsBase, Statistics, Plots, StatsPlots, Random, Distributions, DataFrames, StatFiles, LaTeXStrings, KernelDensity, FixedEffectModels, RegressionTables
 
 # Helper functions
 function weighted_mean_skipmissing(vals, wts)
@@ -59,6 +59,8 @@ end
 data = DataFrame(load("tenncare-micro.dta"))
 data_agg = DataFrame(load("tenncare.dta"))
 
+display(length(unique(data.state)))
+
 # Construct weighted aggregate panel
 agg_panel = combine(groupby(data, [:year, :state])) do df
     DataFrame(
@@ -112,15 +114,64 @@ for (i, var) in enumerate(vars_to_plot)
 end
 
 # TWFE Difference-in-Differences Regression
-data_filtered = filter(row -> 2005 <= row.year <= 2006, data)
-data_filtered.treated = data_filtered.state .== "Tennessee"
-data_filtered.post = data_filtered.year .>= 2006
+data_filtered = filter(row -> 2000 <= row.year <= 2007, data)
+data_filtered.treated_group = (data_filtered.state .== "Tennessee")
 
-twfe_model = reg(data_filtered, @formula(working ~ treated & post + fe(state) + fe(year)))
+# A bit dirty sorry
+data_filtered.year_2000 = (data_filtered.year .== 2000)
+data_filtered.year_2001 = (data_filtered.year .== 2001)
+data_filtered.year_2002 = (data_filtered.year .== 2002)
+data_filtered.year_2003 = (data_filtered.year .== 2003)
+data_filtered.year_2004 = (data_filtered.year .== 2004)
+data_filtered.year_2006 = (data_filtered.year .== 2006)
+data_filtered.year_2007 = (data_filtered.year .== 2007)
+
+data_filtered.year_2000_treated = (data_filtered.year .== 2000) .* (data_filtered.state .== "Tennessee")
+data_filtered.year_2001_treated = (data_filtered.year .== 2001) .* (data_filtered.state .== "Tennessee")
+data_filtered.year_2002_treated = (data_filtered.year .== 2002) .* (data_filtered.state .== "Tennessee")
+data_filtered.year_2003_treated = (data_filtered.year .== 2003) .* (data_filtered.state .== "Tennessee")
+data_filtered.year_2004_treated = (data_filtered.year .== 2004) .* (data_filtered.state .== "Tennessee")
+data_filtered.year_2006_treated = (data_filtered.year .== 2006) .* (data_filtered.state .== "Tennessee")
+data_filtered.year_2007_treated = (data_filtered.year .== 2007) .* (data_filtered.state .== "Tennessee")
+
+twfe_model = reg(data_filtered, @formula(working ~ 1 + treated_group +year_2000 + year_2001 + year_2002 + year_2003 + year_2004 + year_2006 + year_2007 + 
+    year_2000_treated + year_2001_treated + year_2002_treated + year_2003_treated + year_2004_treated + year_2006_treated + year_2007_treated))
 
 println("\n" * "="^80)
-println("TWFE DiD Regression: working ~ treated × post + state FE + year FE")
+println("TWFE DiD Regression")
 println("="^80)
 display(twfe_model)
 println("="^80)
+
+# Create LaTeX table
+regtable(twfe_model;
+    render = LatexTable(),
+    file = "PSET5/twfe_table.tex",
+    regression_statistics = [:nobs],
+    labels = Dict(
+        "treated_group" => "Tennessee",
+        "year_2000" => "Year 2000",
+        "year_2001" => "Year 2001",
+        "year_2002" => "Year 2002",
+        "year_2003" => "Year 2003",
+        "year_2004" => "Year 2004",
+        "year_2006" => "Year 2006",
+        "year_2007" => "Year 2007",
+        "year_2000_treated" => "2000 × Tennessee",
+        "year_2001_treated" => "2001 × Tennessee",
+        "year_2002_treated" => "2002 × Tennessee",
+        "year_2003_treated" => "2003 × Tennessee",
+        "year_2004_treated" => "2004 × Tennessee",
+        "year_2006_treated" => "2006 × Tennessee",
+        "year_2007_treated" => "2007 × Tennessee"
+    ),
+    estimformat = "%0.4f",
+    print_fe_section = false,
+    print_estimator_section = false,
+    below_statistic = nothing,
+    stars = []
+)
+
+println("\nLaTeX table saved to PSET5/twfe_table.tex")
+
 

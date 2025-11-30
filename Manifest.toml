@@ -2,7 +2,7 @@
 
 julia_version = "1.11.7"
 manifest_format = "2.0"
-project_hash = "7be6b9956a7f9135f99c0bd7847eba5668616785"
+project_hash = "03d0df5db39b538528a3f475142ce4116005d7e8"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "27cecae79e5cc9935255f90c53bb831cc3c870d7"
@@ -1540,6 +1540,26 @@ version = "0.6.12"
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "1.2.2"
+
+[[deps.RegressionTables]]
+deps = ["Distributions", "Format", "Statistics", "StatsAPI", "StatsBase", "StatsModels"]
+git-tree-sha1 = "d3607b2cdabf222fa0cc0c01cc94f2bc4dd6be19"
+uuid = "d519eb52-b820-54da-95a6-98e1306fdade"
+version = "0.7.9"
+
+    [deps.RegressionTables.extensions]
+    RegressionTablesFixedEffectModelsExt = "FixedEffectModels"
+    RegressionTablesGLFixedEffectModelsExt = "GLFixedEffectModels"
+    RegressionTablesGLMExt = "GLM"
+    RegressionTablesMixedModelsExt = "MixedModels"
+    RegressionTablesTypstryExt = "Typstry"
+
+    [deps.RegressionTables.weakdeps]
+    FixedEffectModels = "9d5cd8c9-2029-5cab-9928-427838db53e3"
+    GLFixedEffectModels = "bafb0ae5-e5f5-5100-81b6-6a55d777c812"
+    GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
+    MixedModels = "ff71e718-51f3-5ec2-a782-8ffcbfa3c316"
+    Typstry = "f0ed7684-a786-439e-b1e3-3b82803b501e"
 
 [[deps.RelocatableFolders]]
 deps = ["SHA", "Scratch"]
